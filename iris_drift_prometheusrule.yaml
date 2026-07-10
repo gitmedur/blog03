@@ -1,0 +1,61 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: iris-drift-alerts
+  namespace: iris
+  labels:
+    app.kubernetes.io/name: iris-drift-alerts
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: iris-mlops
+
+spec:
+  groups:
+    - name: iris-drift.rules
+      interval: 30s
+
+      rules:
+        - alert: IrisDataDriftDetected
+          expr: |
+            iris_drift_share >= iris_drift_threshold
+          for: 1m
+
+          labels:
+            severity: warning
+            model: iris
+
+          annotations:
+            summary: Iris model data drift detected
+            description: >-
+              The share of drifted Iris features is greater than or equal
+              to the configured drift threshold. Review the latest Evidently
+              report in MinIO at reports/latest/iris_drift_report.html.
+
+        - alert: IrisDriftExporterDown
+          expr: |
+            up{job="iris-drift-exporter"} == 0
+          for: 2m
+
+          labels:
+            severity: warning
+            model: iris
+
+          annotations:
+            summary: Iris drift exporter is unavailable
+            description: >-
+              User Workload Prometheus cannot scrape the Iris drift exporter
+              in namespace iris.
+
+        - alert: IrisDriftExporterMissing
+          expr: |
+            absent(up{job="iris-drift-exporter"})
+          for: 5m
+
+          labels:
+            severity: warning
+            model: iris
+
+          annotations:
+            summary: Iris drift exporter target is missing
+            description: >-
+              Prometheus has no scrape target for the Iris drift exporter.
+              Check the exporter Deployment, Service, and ServiceMonitor.
